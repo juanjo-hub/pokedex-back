@@ -1,6 +1,5 @@
 # 1. Imagen oficial de PHP con Apache
-FROM php:8.2-apache
-
+FROM php:8.4-apache
 # 2. Instalamos extensiones necesarias para Laravel y SQLite
 RUN apt-get update && apt-get install -y \
     libpng-dev \
