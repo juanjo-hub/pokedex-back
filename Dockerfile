@@ -19,22 +19,33 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 # 4. Instalamos extensiones de PHP
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd pdo_sqlite
 
-# 5. Habilitamos mod_rewrite (CRÍTICO para las rutas de Laravel)
+# 5. Habilitamos mod_rewrite
 RUN a2enmod rewrite
 
 # 6. Instalamos Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # 7. Copiamos los archivos del proyecto
-COPY . /var/www/html
+WORKDIR /var/www/html
+COPY . .
 
-# 8. Permisos para Laravel
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+# 8. Instalar dependencias de producción (CRÍTICO - faltaba esto)
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# 9. DocumentRoot a /public de Laravel
+# 9. Crear SQLite y aplicar permisos
+RUN mkdir -p database && touch database/database.sqlite \
+    && chown -R www-data:www-data /var/www/html \
+    && chmod -R 775 storage bootstrap/cache database
+
+# 10. DocumentRoot a /public de Laravel
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
-# 10. Puerto Apache
+# 11. Migrar y arrancar al iniciar el contenedor
+CMD php artisan migrate --force && \
+    php artisan db:seed --force && \
+    apache2-foreground
+
+# 12. Puerto Apache
 EXPOSE 80
